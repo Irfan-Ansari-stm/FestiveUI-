@@ -140,7 +140,7 @@ export abstract class BaseRenderer implements AnimationRuntimeInstance {
   }
 
   private setupAccessibility(): void {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
     this.mediaQueryList = window.matchMedia('(prefers-reduced-motion: reduce)');
     this.prefersReducedMotion = this.mediaQueryList.matches;
     this.mediaQueryList.addEventListener('change', (e) => {

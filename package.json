@@ -14,12 +14,17 @@
     "db:seed": "pnpm --filter @festiveui/api run prisma:seed"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@prisma/client": "5.22.0",
     "@types/bcrypt": "^6.0.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^26.6.6",
     "bcrypt": "^6.0.0",
+    "jest": "^30.5.2",
+    "jest-environment-jsdom": "^30.5.2",
     "prettier": "^3.2.5",
     "prisma": "5.22.0",
+    "ts-jest": "^29.4.15",
     "ts-node": "^10.9.2",
     "turbo": "^2.4.4",
     "typescript": "^5.4.5"
