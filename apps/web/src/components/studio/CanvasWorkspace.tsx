@@ -5,6 +5,7 @@ import { useStudioStore } from './studio-store';
 import { StudioLayer } from './types';
 import { FestiveAnimation } from '@festiveui/react';
 import { CanvasFloatingToolbar } from './CanvasFloatingToolbar';
+import { Clock } from 'lucide-react';
 
 export const CanvasWorkspace: React.FC = () => {
   const store = useStudioStore();
@@ -371,6 +372,20 @@ export const CanvasWorkspace: React.FC = () => {
           );
         })}
       </div>
+
+      {/* Floating Bottom Pill to Reopen Timeline when collapsed */}
+      {!store.timelineOpen && (
+        <button
+          onClick={store.toggleTimeline}
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#111827]/90 border border-[#1F2937] hover:border-primary-500 text-xs font-bold text-white shadow-2xl backdrop-blur-md transition-all hover:scale-105"
+        >
+          <Clock className="w-4 h-4 text-festive-gold" />
+          <span>Open Animation Timeline</span>
+          <span className="px-1.5 py-0.5 rounded-full bg-primary-600 text-[10px] font-mono">
+            {store.layers.length} tracks
+          </span>
+        </button>
+      )}
     </main>
   );
 };

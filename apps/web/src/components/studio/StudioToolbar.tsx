@@ -265,6 +265,23 @@ export const StudioToolbar: React.FC = () => {
           <span className="hidden sm:inline">Save</span>
         </button>
 
+        {/* Timeline Toggle Button */}
+        <button
+          onClick={store.toggleTimeline}
+          className={`px-3 py-1.5 rounded-xl border flex items-center gap-1.5 font-semibold text-xs transition-all ${
+            store.timelineOpen
+              ? 'bg-primary-600 text-white border-primary-500 shadow-md'
+              : 'bg-[#0B0F19] hover:bg-slate-800 text-slate-300 border-[#1F2937] hover:text-white'
+          }`}
+          title={store.timelineOpen ? 'Hide Animation Timeline' : 'Open Animation Timeline (Tracks & Timing)'}
+        >
+          <Clock className="w-3.5 h-3.5 text-festive-gold" />
+          <span className="hidden sm:inline">Timeline</span>
+          <span className="text-[10px] font-mono px-1 rounded bg-black/30 text-white font-bold">
+            {store.layers.length}
+          </span>
+        </button>
+
         {/* Live Preview Button */}
         <button
           onClick={() => store.setPreviewModalOpen(true)}

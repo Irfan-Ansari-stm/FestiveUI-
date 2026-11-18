@@ -197,7 +197,7 @@ export const useStudioStore = create<StudioStoreState>((set, get) => ({
 
   isLeftSidebarOpen: true,
   isRightInspectorOpen: true,
-  timelineOpen: false,
+  timelineOpen: true,
   timelineHeight: 220,
   isTimelineMaximized: false,
 
