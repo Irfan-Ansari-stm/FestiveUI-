@@ -777,6 +777,202 @@ async function main() {
   });
 
   console.log(`[Seed] Seeded project: ${project.name} (${project.id})`);
+
+  // 8. Seed Additional Enterprise Applications
+  const enterpriseApps = [
+    {
+      name: 'Global Flagship eCommerce Store',
+      websiteUrl: 'https://store.festiveui.com',
+      framework: 'next',
+      environment: 'production',
+      domain: 'store.festiveui.com'
+    },
+    {
+      name: 'Holiday Promotional Campaign App',
+      websiteUrl: 'https://holiday.festiveui.com',
+      framework: 'react',
+      environment: 'production',
+      domain: 'holiday.festiveui.com'
+    },
+    {
+      name: 'Mobile Checkout Experience',
+      websiteUrl: 'https://m.festiveui.com',
+      framework: 'vue',
+      environment: 'production',
+      domain: 'm.festiveui.com'
+    },
+    {
+      name: 'Customer Portal & Documentation',
+      websiteUrl: 'https://docs.festiveui.com',
+      framework: 'next',
+      environment: 'staging',
+      domain: 'docs.festiveui.com'
+    }
+  ];
+
+  for (const app of enterpriseApps) {
+    const existingApp = await prisma.project.findFirst({ where: { name: app.name } });
+    if (!existingApp) {
+      await prisma.project.create({
+        data: {
+          userId: sampleDeveloper.id,
+          name: app.name,
+          websiteUrl: app.websiteUrl,
+          framework: app.framework,
+          environment: app.environment,
+          domains: {
+            create: [
+              { domain: app.domain, verified: true },
+              { domain: 'localhost:3000', verified: true }
+            ]
+          },
+          apiKeys: {
+            create: {
+              name: `${app.name} Live Key`,
+              keyPrefix: `fst_live_${Math.random().toString(36).substring(2, 6)}`,
+              keyHash: await bcrypt.hash(`fst_live_key_${app.name}`, 10)
+            }
+          }
+        }
+      });
+    }
+  }
+
+  // 9. Seed Festival Campaigns
+  const diwaliFest = await prisma.festival.findUnique({ where: { slug: 'diwali' } });
+  const christmasFest = await prisma.festival.findUnique({ where: { slug: 'christmas' } });
+  const newYearFest = await prisma.festival.findUnique({ where: { slug: 'new-year' } });
+  const eidFest = await prisma.festival.findUnique({ where: { slug: 'eid' } });
+  const holiFest = await prisma.festival.findUnique({ where: { slug: 'holi' } });
+  const halloweenFest = await prisma.festival.findUnique({ where: { slug: 'halloween' } });
+
+  const campaigns = [
+    {
+      name: 'Diwali Festival of Lights 2026',
+      festivalId: diwaliFest?.id,
+      status: 'ACTIVE',
+      scheduleStart: new Date('2026-10-25T00:00:00Z'),
+      scheduleEnd: new Date('2026-11-20T23:59:59Z'),
+      intensity: 'SPECTACULAR',
+      targetDomains: ['store.festiveui.com', 'holiday.festiveui.com', 'm.festiveui.com', 'localhost:3000'],
+      rendersCount: 482900,
+      animations: ['diya-glow', 'diwali-fireworks', 'golden-particles']
+    },
+    {
+      name: 'Winter Holiday & Snowfall Season',
+      festivalId: christmasFest?.id,
+      status: 'ACTIVE',
+      scheduleStart: new Date('2026-12-01T00:00:00Z'),
+      scheduleEnd: new Date('2026-12-31T23:59:59Z'),
+      intensity: 'BALANCED',
+      targetDomains: ['store.festiveui.com', 'holiday.festiveui.com', 'm.festiveui.com'],
+      rendersCount: 320500,
+      animations: ['falling-snow', 'christmas-lights', 'christmas-tree']
+    },
+    {
+      name: 'Global New Year 2027 Countdown',
+      festivalId: newYearFest?.id,
+      status: 'SCHEDULED',
+      scheduleStart: new Date('2026-12-30T00:00:00Z'),
+      scheduleEnd: new Date('2027-01-05T23:59:59Z'),
+      intensity: 'SPECTACULAR',
+      targetDomains: ['store.festiveui.com', 'holiday.festiveui.com', 'm.festiveui.com', 'docs.festiveui.com'],
+      rendersCount: 280900,
+      animations: ['new-year-confetti', 'fireworks-burst', 'countdown-animation']
+    },
+    {
+      name: 'Eid al-Fitr Illuminated Lanterns',
+      festivalId: eidFest?.id,
+      status: 'ACTIVE',
+      scheduleStart: new Date('2027-03-20T00:00:00Z'),
+      scheduleEnd: new Date('2027-04-05T23:59:59Z'),
+      intensity: 'SUBTLE',
+      targetDomains: ['store.festiveui.com', 'm.festiveui.com'],
+      rendersCount: 162900,
+      animations: ['eid-lantern', 'crescent-moon']
+    },
+    {
+      name: 'Holi Colors Spring Festival',
+      festivalId: holiFest?.id,
+      status: 'SCHEDULED',
+      scheduleStart: new Date('2027-03-08T00:00:00Z'),
+      scheduleEnd: new Date('2027-03-16T23:59:59Z'),
+      intensity: 'SPECTACULAR',
+      targetDomains: ['holiday.festiveui.com', 'm.festiveui.com'],
+      rendersCount: 154200,
+      animations: ['holi-color-splash', 'holi-color-particles']
+    },
+    {
+      name: 'Halloween Twilight Fog & Spooks',
+      festivalId: halloweenFest?.id,
+      status: 'DRAFT',
+      scheduleStart: new Date('2026-10-20T00:00:00Z'),
+      scheduleEnd: new Date('2026-11-02T23:59:59Z'),
+      intensity: 'BALANCED',
+      targetDomains: [],
+      rendersCount: 42100,
+      animations: []
+    }
+  ];
+
+  for (const c of campaigns) {
+    const existing = await prisma.campaign.findFirst({ where: { name: c.name } });
+    if (!existing) {
+      await prisma.campaign.create({ data: c });
+    }
+  }
+
+  // 10. Seed System Alerts
+  const alerts = [
+    {
+      severity: 'INFO',
+      title: 'Global Edge CDN Cache Synchronized',
+      message: 'All 285 Cloudflare edge Points of Presence successfully verified cache consistency.',
+      source: 'CDN',
+      resolved: true
+    },
+    {
+      severity: 'WARNING',
+      title: 'High API Burst on /v1/render/diya-glow',
+      message: 'Client domain store.festiveui.com experienced 1,480 req/min (normal 600 req/min). Auto-scaled safely.',
+      source: 'API',
+      resolved: true
+    },
+    {
+      severity: 'INFO',
+      title: 'PostgreSQL 16 Connection Pool Healthy',
+      message: 'Primary read/write connection pool at 12 active / 100 max connections. Latency < 1.2ms.',
+      source: 'DATABASE',
+      resolved: false
+    }
+  ];
+
+  for (const a of alerts) {
+    const existing = await prisma.systemAlert.findFirst({ where: { title: a.title } });
+    if (!existing) {
+      await prisma.systemAlert.create({ data: a });
+    }
+  }
+
+  // 11. Seed Platform Settings
+  const settings = [
+    { key: 'platform.name', value: 'FestiveUI Enterprise Cloud', category: 'GENERAL', description: 'Public facing platform service name' },
+    { key: 'platform.environment', value: 'PRODUCTION', category: 'GENERAL', description: 'Deployment cluster environment' },
+    { key: 'cdn.provider', value: 'Cloudflare Enterprise', category: 'CDN', description: 'Global content delivery network provider' },
+    { key: 'cdn.auto_purge', value: 'true', category: 'CDN', description: 'Automatically purge CDN when animations or themes update' },
+    { key: 'api.rate_limit_per_minute', value: '1000', category: 'SECURITY', description: 'Default API request limit per minute for verified domains' },
+    { key: 'runtime.target_fps', value: '60', category: 'RUNTIME', description: 'Target canvas animation frames per second' },
+    { key: 'runtime.hardware_acceleration', value: 'true', category: 'RUNTIME', description: 'Require GPU canvas acceleration where available' }
+  ];
+
+  for (const s of settings) {
+    await prisma.platformSetting.upsert({
+      where: { key: s.key },
+      update: s,
+      create: s
+    });
+  }
+
   console.log('[Seed] Database seed completed successfully!');
 }
 

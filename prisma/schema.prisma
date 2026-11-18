@@ -203,6 +203,7 @@ model Festival {
 
   collections FestivalCollection[]
   animations  Animation[]
+  campaigns   Campaign[]
 
   @@map("festivals")
 }
@@ -803,4 +804,50 @@ model UserDashboardOverride {
   action    DashboardAction? @relation(fields: [actionId], references: [id], onDelete: Cascade)
 
   @@map("user_dashboard_overrides")
+}
+
+// 41. campaigns
+model Campaign {
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String
+  festivalId    String?   @map("festival_id") @db.Uuid
+  status        String    @default("ACTIVE") // DRAFT, SCHEDULED, ACTIVE, PAUSED, COMPLETED, ARCHIVED
+  scheduleStart DateTime? @map("schedule_start")
+  scheduleEnd   DateTime? @map("schedule_end")
+  intensity     String    @default("SPECTACULAR") // SUBTLE, BALANCED, SPECTACULAR
+  timezone      String    @default("UTC")
+  targetDomains String[]  @default([]) @map("target_domains")
+  animations    Json?
+  rendersCount  Int       @default(0) @map("renders_count")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  festival      Festival? @relation(fields: [festivalId], references: [id], onDelete: SetNull)
+
+  @@map("campaigns")
+}
+
+// 42. system_alerts
+model SystemAlert {
+  id        String   @id @default(uuid()) @db.Uuid
+  severity  String   @default("INFO") // INFO, WARNING, CRITICAL
+  title     String
+  message   String
+  source    String   @default("INFRASTRUCTURE") // API, CDN, DATABASE, WORKER, SECURITY
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("system_alerts")
+}
+
+// 43. platform_settings
+model PlatformSetting {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique
+  value       String
+  description String?
+  category    String   @default("GENERAL") // GENERAL, CDN, SECURITY, BILLING, RUNTIME
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
 }

@@ -8,6 +8,7 @@ import { EditorModule } from './editor/editor.module';
 import { PaymentsModule } from './payments/payments.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { AdminModule } from './admin/admin.module';
+import { ControlCenterModule } from './control-center/control-center.module';
 
 @Module({
   imports: [
@@ -19,7 +20,8 @@ import { AdminModule } from './admin/admin.module';
     EditorModule,
     PaymentsModule,
     SubscriptionsModule,
-    AdminModule
+    AdminModule,
+    ControlCenterModule
   ]
 })
 export class AppModule {}
