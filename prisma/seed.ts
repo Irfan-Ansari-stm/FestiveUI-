@@ -1,33 +1,136 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import {
+  PERMISSION_GROUPS,
+  ALL_PERMISSIONS,
+  DEFAULT_ROLE_PRESETS,
+  DASHBOARD_TREE
+} from '../packages/permissions/src/index.ts';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('[Seed] Starting database seed...');
+  console.log('[Seed] Starting advanced RBAC database seed...');
 
-  // 1. Roles & Permissions
-  const roles = ['SUPER_ADMIN', 'ADMIN', 'DEVELOPER', 'USER'];
-  for (const roleName of roles) {
-    await prisma.role.upsert({
-      where: { name: roleName },
-      update: {},
-      create: {
-        name: roleName,
-        description: `Standard ${roleName} system role`
-      }
+  // 1. Permission Groups
+  for (const group of PERMISSION_GROUPS) {
+    await prisma.permissionGroup.upsert({
+      where: { slug: group.slug },
+      update: { name: group.name, description: group.description, sortOrder: group.sortOrder },
+      create: { slug: group.slug, name: group.name, description: group.description, sortOrder: group.sortOrder }
     });
   }
+  console.log(`[Seed] Seeded ${PERMISSION_GROUPS.length} permission groups`);
 
-  const superAdminRole = await prisma.role.findUniqueOrThrow({ where: { name: 'SUPER_ADMIN' } });
-  const devRole = await prisma.role.findUniqueOrThrow({ where: { name: 'DEVELOPER' } });
+  // 2. Granular Permissions
+  const permissionMap = new Map<string, string>();
+  for (const perm of ALL_PERMISSIONS) {
+    const p = await prisma.permission.upsert({
+      where: { slug: perm.slug },
+      update: { name: perm.name, module: perm.module, action: perm.action, level: perm.level, description: perm.description },
+      create: { slug: perm.slug, name: perm.name, module: perm.module, action: perm.action, level: perm.level, description: perm.description }
+    });
+    permissionMap.set(perm.slug, p.id);
+  }
+  console.log(`[Seed] Seeded ${ALL_PERMISSIONS.length} granular permissions across 5 levels`);
 
-  // 2. Default Users
+  // 3. Roles and RolePermissions
+  const roleMap = new Map<string, string>();
+  for (const preset of DEFAULT_ROLE_PRESETS) {
+    const role = await prisma.role.upsert({
+      where: { slug: preset.slug },
+      update: {
+        name: preset.name,
+        description: preset.description,
+        isSystem: preset.isSystem,
+        isSuperAdmin: preset.isSuperAdmin,
+        status: 'ACTIVE'
+      },
+      create: {
+        name: preset.name,
+        slug: preset.slug,
+        description: preset.description,
+        isSystem: preset.isSystem,
+        isSuperAdmin: preset.isSuperAdmin,
+        status: 'ACTIVE'
+      }
+    });
+    roleMap.set(preset.slug, role.id);
+    roleMap.set(preset.name, role.id);
+
+    // Assign role permissions
+    await prisma.rolePermission.deleteMany({ where: { roleId: role.id } });
+    if (preset.permissions.includes('*')) {
+      // Super admin has wildcard access to all permissions
+      for (const [slug, permId] of permissionMap.entries()) {
+        await prisma.rolePermission.create({
+          data: { roleId: role.id, permissionId: permId, effect: 'ALLOW' }
+        });
+      }
+    } else {
+      for (const slug of preset.permissions) {
+        const permId = permissionMap.get(slug);
+        if (permId) {
+          await prisma.rolePermission.create({
+            data: { roleId: role.id, permissionId: permId, effect: 'ALLOW' }
+          });
+        }
+      }
+    }
+  }
+
+  // Developer and User roles compatibility
+  const devRole = await prisma.role.upsert({
+    where: { slug: 'developer' },
+    update: { name: 'Developer', isSystem: true },
+    create: { name: 'Developer', slug: 'developer', description: 'Website developer creating apps and generating API keys', isSystem: true }
+  });
+  roleMap.set('DEVELOPER', devRole.id);
+  roleMap.set('developer', devRole.id);
+
+  const userRole = await prisma.role.upsert({
+    where: { slug: 'user' },
+    update: { name: 'Standard User', isSystem: true },
+    create: { name: 'Standard User', slug: 'user', description: 'End-user browsing animations and marketplace', isSystem: true }
+  });
+  roleMap.set('USER', userRole.id);
+  roleMap.set('user', userRole.id);
+
+  console.log(`[Seed] Seeded ${DEFAULT_ROLE_PRESETS.length + 2} roles with active permission assignments`);
+
+  // 4. Dashboard Modules, Pages, and Actions
+  for (const mod of DASHBOARD_TREE) {
+    const dModule = await prisma.dashboardModule.upsert({
+      where: { slug: mod.slug },
+      update: { name: mod.name, icon: mod.icon, route: mod.route, sortOrder: mod.sortOrder, permissionSlug: mod.permissionSlug },
+      create: { slug: mod.slug, name: mod.name, icon: mod.icon, route: mod.route, sortOrder: mod.sortOrder, permissionSlug: mod.permissionSlug }
+    });
+
+    for (const page of mod.pages) {
+      const dPage = await prisma.dashboardPage.upsert({
+        where: { slug: page.slug },
+        update: { moduleId: dModule.id, name: page.name, route: page.route, sortOrder: page.sortOrder, permissionSlug: page.permissionSlug },
+        create: { moduleId: dModule.id, slug: page.slug, name: page.name, route: page.route, sortOrder: page.sortOrder, permissionSlug: page.permissionSlug }
+      });
+
+      if (page.actions) {
+        for (const act of page.actions) {
+          await prisma.dashboardAction.create({
+            data: { pageId: dPage.id, name: act.name, permissionSlug: act.permissionSlug }
+          });
+        }
+      }
+    }
+  }
+  console.log(`[Seed] Seeded ${DASHBOARD_TREE.length} dashboard modules & hierarchical section pages`);
+
+  // 5. Default Users & Bootstrap Super Admin
   const passwordHash = await bcrypt.hash('Festive@2026!', 10);
+  const superAdminRoleId = roleMap.get('super_admin')!;
 
   const superAdmin = await prisma.user.upsert({
     where: { email: 'admin@festiveui.com' },
-    update: {},
+    update: { status: 'ACTIVE' },
     create: {
       email: 'admin@festiveui.com',
       passwordHash,
@@ -43,7 +146,55 @@ async function main() {
       },
       userRoles: {
         create: {
-          roleId: superAdminRole.id
+          roleId: superAdminRoleId
+        }
+      }
+    }
+  });
+
+  const contentAdmin = await prisma.user.upsert({
+    where: { email: 'content@festiveui.com' },
+    update: { status: 'ACTIVE' },
+    create: {
+      email: 'content@festiveui.com',
+      passwordHash,
+      emailVerified: true,
+      status: 'ACTIVE',
+      profile: {
+        create: {
+          firstName: 'Sara',
+          lastName: 'Content Lead',
+          company: 'FestiveUI Creative Studio',
+          country: 'United Kingdom'
+        }
+      },
+      userRoles: {
+        create: {
+          roleId: roleMap.get('content_manager')!
+        }
+      }
+    }
+  });
+
+  const financeAdmin = await prisma.user.upsert({
+    where: { email: 'finance@festiveui.com' },
+    update: { status: 'ACTIVE' },
+    create: {
+      email: 'finance@festiveui.com',
+      passwordHash,
+      emailVerified: true,
+      status: 'ACTIVE',
+      profile: {
+        create: {
+          firstName: 'David',
+          lastName: 'Finance Manager',
+          company: 'FestiveUI Payments',
+          country: 'Germany'
+        }
+      },
+      userRoles: {
+        create: {
+          roleId: roleMap.get('finance_manager')!
         }
       }
     }
@@ -51,7 +202,7 @@ async function main() {
 
   const sampleDeveloper = await prisma.user.upsert({
     where: { email: 'developer@festiveui.com' },
-    update: {},
+    update: { status: 'ACTIVE' },
     create: {
       email: 'developer@festiveui.com',
       passwordHash,
@@ -69,6 +220,22 @@ async function main() {
         create: {
           roleId: devRole.id
         }
+      }
+    }
+  });
+
+  // Seed initial audit log
+  await prisma.auditLog.create({
+    data: {
+      userId: superAdmin.id,
+      actorEmail: 'admin@festiveui.com',
+      action: 'SYSTEM_BOOTSTRAP',
+      resource: 'platform/bootstrap',
+      entityType: 'SYSTEM',
+      entityId: superAdmin.id,
+      metadata: {
+        event: 'Enterprise Super Admin & RBAC Matrix initialized',
+        timestamp: new Date().toISOString()
       }
     }
   });

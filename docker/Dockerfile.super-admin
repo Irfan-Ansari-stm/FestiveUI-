@@ -1,0 +1,24 @@
+FROM node:20-alpine AS base
+RUN corepack enable && corepack prepare pnpm@12.16.1 --activate
+
+FROM base AS builder
+WORKDIR /app
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY packages/ ./packages/
+COPY apps/super-admin/ ./apps/super-admin/
+
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @festiveui/permissions run build
+RUN pnpm --filter @festiveui/super-admin run build
+
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3001
+
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/apps/super-admin ./apps/super-admin
+
+EXPOSE 3001
+CMD ["pnpm", "--filter", "@festiveui/super-admin", "run", "start"]
