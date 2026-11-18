@@ -226,19 +226,36 @@ export default function StudioPage() {
     : availableAnimations;
 
   return (
-    <div className="w-full h-[calc(100vh-64px)] flex flex-col bg-slate-950 text-slate-100 overflow-hidden select-none">
+    <div className="w-full h-screen flex flex-col bg-slate-950 text-slate-100 overflow-hidden select-none">
       {/* 1. TOP TOOLBAR */}
       <div className="h-14 border-b border-border bg-surface px-4 flex items-center justify-between shrink-0 z-20">
-        {/* Left: Document Name & Mode Switcher */}
+        {/* Left: Brand Icon, Document Name & Mode Switcher */}
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-surfaceHover">
-            <ArrowLeft className="w-4 h-4" />
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition-all text-xs font-semibold"
+            title="Return to Application Dashboard"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-primary-400" />
+            <span className="hidden sm:inline">Dashboard</span>
           </Link>
+
+          <div className="flex items-center gap-2 pl-1 border-l border-slate-800">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-primary-600 to-festive-gold p-0.5 flex-shrink-0">
+              <div className="w-full h-full bg-slate-950 rounded-[6px] flex items-center justify-center">
+                <Sparkles className="w-3.5 h-3.5 text-festive-gold" />
+              </div>
+            </div>
+            <span className="text-xs font-bold text-white hidden md:inline">
+              Studio <span className="text-primary-400 font-mono text-[10px] px-1.5 py-0.5 rounded bg-primary-500/10 border border-primary-500/20">v2.4</span>
+            </span>
+          </div>
+
           <input
             type="text"
             value={store.title}
             onChange={(e) => store.setTitle(e.target.value)}
-            className="bg-transparent border-b border-transparent hover:border-slate-600 focus:border-primary-500 text-sm font-bold text-white px-1 py-0.5 focus:outline-none w-48 sm:w-64"
+            className="bg-transparent border-b border-transparent hover:border-slate-600 focus:border-primary-500 text-sm font-bold text-white px-1 py-0.5 focus:outline-none w-40 sm:w-56"
           />
 
           <div className="hidden sm:flex items-center gap-1 p-0.5 rounded-lg bg-slate-950 border border-border text-xs">

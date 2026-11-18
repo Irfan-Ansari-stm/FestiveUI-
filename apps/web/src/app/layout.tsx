@@ -1,7 +1,6 @@
 import './globals.css';
 import { Metadata } from 'next';
-import { Navbar } from '@/components/Navbar';
-import { Footer } from '@/components/Footer';
+import { AppShell } from '@/components/AppShell';
 
 export const metadata: Metadata = {
   title: 'FestiveUI — Festival & Event UI Animation Library, Visual Studio & Marketplace',
@@ -17,11 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen flex flex-col bg-background text-slate-100 antialiased selection:bg-primary-500/30 selection:text-primary-200">
-        <Navbar />
-        <main className="flex-1 w-full">
+        <AppShell>
           {children}
-        </main>
-        <Footer />
+        </AppShell>
       </body>
     </html>
   );

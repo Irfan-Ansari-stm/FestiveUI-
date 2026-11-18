@@ -481,8 +481,23 @@ export default function EnterpriseApplicationDashboard() {
           </div>
         </div>
 
-        {/* Quick Portal Switcher to Super Admin on :3001 */}
-        <div className="flex items-center gap-3">
+        {/* Quick Portal Switcher to Super Admin on :3001 & Platform Links */}
+        <div className="flex items-center gap-4">
+          <div className="hidden lg:flex items-center gap-3 pr-2 border-r border-slate-800 text-[11px]">
+            <Link href="/" className="text-slate-400 hover:text-white flex items-center gap-1 transition-colors font-medium">
+              <Globe className="w-3.5 h-3.5 text-slate-400" />
+              <span>Main Website</span>
+            </Link>
+            <Link href="/marketplace" className="text-slate-400 hover:text-white flex items-center gap-1 transition-colors font-medium">
+              <Film className="w-3.5 h-3.5 text-primary-400" />
+              <span>Marketplace</span>
+            </Link>
+            <Link href="/docs" className="text-slate-400 hover:text-white flex items-center gap-1 transition-colors font-medium">
+              <Code2 className="w-3.5 h-3.5 text-blue-400" />
+              <span>Docs</span>
+            </Link>
+          </div>
+
           <a
             href="http://localhost:3001"
             target="_blank"
