@@ -14,7 +14,7 @@ export class ApiClient {
   static getToken(): string | null {
     if (this.token) return this.token;
     if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('festiveui_token');
+      this.token = localStorage.getItem('festiveui_token') || localStorage.getItem('festiveui_admin_token');
     }
     return this.token;
   }
