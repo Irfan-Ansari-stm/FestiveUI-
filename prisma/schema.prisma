@@ -24,6 +24,9 @@ model User {
 
   profile          UserProfile?
   userRoles        UserRole[]
+  permissionOverrides UserPermissionOverride[]
+  adminSessions    AdminSession[]
+  dashboardOverrides UserDashboardOverride[]
   projects         Project[]
   purchases        Purchase[]
   orders           Order[]
@@ -56,51 +59,128 @@ model UserProfile {
 
 // 3. roles
 model Role {
-  id          String     @id @default(uuid()) @db.Uuid
-  name        String     @unique // SUPER_ADMIN, ADMIN, DEVELOPER, USER
-  description String?
-  createdAt   DateTime   @default(now()) @map("created_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
+  id              String               @id @default(uuid()) @db.Uuid
+  name            String               @unique // e.g. "Super Admin", "Content Manager"
+  slug            String               @unique @default(uuid()) // e.g. "super_admin", "content_manager"
+  description     String?
+  isSystem        Boolean              @default(false) @map("is_system")
+  isSuperAdmin    Boolean              @default(false) @map("is_super_admin")
+  status          String               @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
 
-  userRoles   UserRole[]
-  permissions RolePermission[]
+  userRoles       UserRole[]
+  permissions     RolePermission[]
+  parentRoles     RoleHierarchy[]      @relation("ChildRole")
+  childRoles      RoleHierarchy[]      @relation("ParentRole")
+  dashboardAccess RoleDashboardAccess[]
 
   @@map("roles")
 }
 
 // 4. permissions
 model Permission {
-  id          String           @id @default(uuid()) @db.Uuid
-  name        String           @unique // e.g. "animations:create", "festivals:publish"
-  description String?
-  createdAt   DateTime         @default(now()) @map("created_at")
+  id            String                   @id @default(uuid()) @db.Uuid
+  name          String                   @unique // e.g. "Create Animations"
+  slug          String                   @unique // e.g. "animations.create"
+  module        String                   @default("general")
+  action        String?
+  level         Int                      @default(1) // 1: Module, 2: Page, 3: Action, 4: Component, 5: Data
+  description   String?
+  createdAt     DateTime                 @default(now()) @map("created_at")
+  updatedAt     DateTime                 @updatedAt @map("updated_at")
 
-  roles       RolePermission[]
+  roles         RolePermission[]
+  userOverrides UserPermissionOverride[]
 
   @@map("permissions")
 }
 
-// Mapping roles to permissions
+// 4b. permission_groups
+model PermissionGroup {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String   @unique
+  description String?
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("permission_groups")
+}
+
+// Mapping roles to permissions with ALLOW/DENY effect
 model RolePermission {
+  id           String     @id @default(uuid()) @db.Uuid
   roleId       String     @map("role_id") @db.Uuid
   permissionId String     @map("permission_id") @db.Uuid
+  effect       String     @default("ALLOW") // ALLOW, DENY
+  createdAt    DateTime   @default(now()) @map("created_at")
 
   role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
-  @@id([roleId, permissionId])
+  @@unique([roleId, permissionId])
   @@map("role_permissions")
+}
+
+// 4c. role_hierarchy
+model RoleHierarchy {
+  id           String   @id @default(uuid()) @db.Uuid
+  parentRoleId String   @map("parent_role_id") @db.Uuid
+  childRoleId  String   @map("child_role_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  parentRole   Role     @relation("ParentRole", fields: [parentRoleId], references: [id], onDelete: Cascade)
+  childRole    Role     @relation("ChildRole", fields: [childRoleId], references: [id], onDelete: Cascade)
+
+  @@unique([parentRoleId, childRoleId])
+  @@map("role_hierarchy")
+}
+
+// 4d. user_permission_overrides
+model UserPermissionOverride {
+  id           String     @id @default(uuid()) @db.Uuid
+  userId       String     @map("user_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  effect       String     @default("ALLOW") // ALLOW, DENY
+  assignedBy   String?    @map("assigned_by") @db.Uuid
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permissionId])
+  @@map("user_permission_overrides")
+}
+
+// 4e. admin_sessions
+model AdminSession {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @map("token_hash")
+  ipAddress  String?   @map("ip_address")
+  userAgent  String?   @map("user_agent")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@map("admin_sessions")
 }
 
 // 5. user_roles
 model UserRole {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
-  roleId    String   @map("role_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at")
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  roleId     String    @map("role_id") @db.Uuid
+  assignedBy String?   @map("assigned_by") @db.Uuid
+  assignedAt DateTime  @default(now()) @map("assigned_at")
+  expiresAt  DateTime? @map("expires_at")
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([userId, roleId])
   @@map("user_roles")
@@ -607,16 +687,120 @@ model Notification {
 
 // 35. audit_logs
 model AuditLog {
-  id         String   @id @default(uuid()) @db.Uuid
-  userId     String?  @map("user_id") @db.Uuid
-  action     String   // e.g. "ANIMATION_PUBLISHED", "USER_ROLE_CHANGED", "KEY_REVOKED"
-  resource   String   // e.g. "animations/123"
-  ipAddress  String?  @map("ip_address")
-  metadata   Json?
-  createdAt  DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  actorEmail     String?  @map("actor_email")
+  action         String   // e.g. "ROLE_CREATED", "PERMISSION_CHANGED", "USER_SUSPENDED"
+  resource       String   // e.g. "roles/animation_manager", "users/123"
+  entityType     String?  @map("entity_type")
+  entityId       String?  @map("entity_id")
+  previousValues Json?    @map("previous_values")
+  newValues      Json?    @map("new_values")
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+  correlationId  String?  @map("correlation_id")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
 
-  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([action, createdAt])
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
   @@map("audit_logs")
+}
+
+// 36. dashboard_modules
+model DashboardModule {
+  id             String                  @id @default(uuid()) @db.Uuid
+  name           String
+  slug           String                  @unique
+  icon           String?
+  route          String?
+  sortOrder      Int                     @default(0) @map("sort_order")
+  status         String                  @default("ACTIVE") // ACTIVE, INACTIVE
+  permissionSlug String                  @default("overview.view") @map("permission_slug")
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+
+  pages          DashboardPage[]
+  roleAccess     RoleDashboardAccess[]
+  userOverrides  UserDashboardOverride[]
+
+  @@map("dashboard_modules")
+}
+
+// 37. dashboard_pages
+model DashboardPage {
+  id             String                  @id @default(uuid()) @db.Uuid
+  moduleId       String                  @map("module_id") @db.Uuid
+  name           String
+  slug           String                  @unique
+  route          String
+  parentId       String?                 @map("parent_id") @db.Uuid
+  sortOrder      Int                     @default(0) @map("sort_order")
+  permissionSlug String                  @map("permission_slug")
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+
+  module         DashboardModule         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  parent         DashboardPage?          @relation("PageHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children       DashboardPage[]         @relation("PageHierarchy")
+  actions        DashboardAction[]
+  roleAccess     RoleDashboardAccess[]
+  userOverrides  UserDashboardOverride[]
+
+  @@map("dashboard_pages")
+}
+
+// 38. dashboard_actions
+model DashboardAction {
+  id             String                  @id @default(uuid()) @db.Uuid
+  pageId         String                  @map("page_id") @db.Uuid
+  name           String
+  permissionSlug String                  @map("permission_slug")
+  createdAt      DateTime                @default(now()) @map("created_at")
+
+  page           DashboardPage           @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  roleAccess     RoleDashboardAccess[]
+  userOverrides  UserDashboardOverride[]
+
+  @@map("dashboard_actions")
+}
+
+// 39. role_dashboard_access
+model RoleDashboardAccess {
+  id        String           @id @default(uuid()) @db.Uuid
+  roleId    String           @map("role_id") @db.Uuid
+  moduleId  String?          @map("module_id") @db.Uuid
+  pageId    String?          @map("page_id") @db.Uuid
+  actionId  String?          @map("action_id") @db.Uuid
+  isAllowed Boolean          @default(true) @map("is_allowed")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  role      Role             @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  module    DashboardModule? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  page      DashboardPage?   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  action    DashboardAction? @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, moduleId, pageId, actionId])
+  @@map("role_dashboard_access")
+}
+
+// 40. user_dashboard_overrides
+model UserDashboardOverride {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  moduleId  String?          @map("module_id") @db.Uuid
+  pageId    String?          @map("page_id") @db.Uuid
+  actionId  String?          @map("action_id") @db.Uuid
+  isAllowed Boolean          @map("is_allowed")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module    DashboardModule? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  page      DashboardPage?   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  action    DashboardAction? @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  @@map("user_dashboard_overrides")
 }
