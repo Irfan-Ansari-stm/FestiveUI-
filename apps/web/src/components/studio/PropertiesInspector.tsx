@@ -374,7 +374,46 @@ export const PropertiesInspector: React.FC = () => {
               </div>
             </div>
 
-            {/* 5. ANIMATION BEHAVIOR */}
+            {/* 5. TIMELINE & LAYER TIMING */}
+            <div className="space-y-3 pt-2 border-t border-[#1F2937]">
+              <span className="font-bold text-white block">Timeline & Layer Timing</span>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="text-[10px] text-slate-400 block mb-1">Start Time (sec)</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max={store.totalDuration - 0.2}
+                    value={selectedLayer.timelineStart}
+                    onChange={(e) => store.updateLayerTiming(selectedLayer.id, Number(e.target.value), selectedLayer.timelineDuration)}
+                    className="w-full px-2 py-1.5 rounded-xl bg-[#0B0F19] border border-[#1F2937] text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block mb-1">Duration (sec)</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.2"
+                    max={store.totalDuration - selectedLayer.timelineStart}
+                    value={selectedLayer.timelineDuration}
+                    onChange={(e) => store.updateLayerTiming(selectedLayer.id, selectedLayer.timelineStart, Number(e.target.value))}
+                    className="w-full px-2 py-1.5 rounded-xl bg-[#0B0F19] border border-[#1F2937] text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-slate-400 bg-[#0B0F19] px-2.5 py-1.5 rounded-xl border border-[#1F2937]/60 font-mono">
+                <span>Active Interval:</span>
+                <span className="text-primary-400 font-bold">
+                  {selectedLayer.timelineStart.toFixed(2)}s – {(selectedLayer.timelineStart + selectedLayer.timelineDuration).toFixed(2)}s
+                </span>
+              </div>
+            </div>
+
+            {/* 6. ANIMATION BEHAVIOR */}
             <div className="space-y-2.5 pt-2 border-t border-[#1F2937]">
               <span className="font-bold text-white block">Animation Settings</span>
 

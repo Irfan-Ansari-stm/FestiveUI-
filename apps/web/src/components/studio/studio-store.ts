@@ -45,6 +45,8 @@ export interface StudioStoreState {
   totalDuration: number;
   playbackSpeed: number;
   isLooping: boolean;
+  timelineZoom: number;
+  snapToTimelineGrid: boolean;
 
   // Save Status
   saveStatus: 'saved' | 'saving' | 'unsaved' | 'error';
@@ -100,8 +102,14 @@ export interface StudioStoreState {
   togglePlayback: () => void;
   restart: () => void;
   seek: (time: number) => void;
+  stepTime: (deltaSec: number) => void;
+  setTotalDuration: (duration: number) => void;
   setPlaybackSpeed: (speed: number) => void;
   toggleLoop: () => void;
+  setTimelineZoom: (zoom: number) => void;
+  toggleTimelineSnap: () => void;
+  updateLayerTiming: (id: string, start: number, duration: number) => void;
+  reorderLayersList: (sourceIndex: number, destIndex: number) => void;
 
   saveProject: () => Promise<void>;
   loadTemplate: (templateId: string) => void;
@@ -206,6 +214,8 @@ export const useStudioStore = create<StudioStoreState>((set, get) => ({
   totalDuration: 10,
   playbackSpeed: 1.0,
   isLooping: true,
+  timelineZoom: 1.0,
+  snapToTimelineGrid: true,
 
   saveStatus: 'saved',
   lastSavedTime: 'Just now',
@@ -465,9 +475,66 @@ export const useStudioStore = create<StudioStoreState>((set, get) => ({
   pause: () => set({ isPlaying: false }),
   togglePlayback: () => set(state => ({ isPlaying: !state.isPlaying })),
   restart: () => set({ currentTime: 0, isPlaying: false }),
-  seek: (currentTime) => set({ currentTime }),
+  seek: (currentTime) => {
+    const { totalDuration } = get();
+    const clamped = Math.max(0, Math.min(totalDuration, currentTime));
+    set({ currentTime: Number(clamped.toFixed(3)) });
+  },
+  stepTime: (deltaSec) => {
+    const { currentTime, totalDuration } = get();
+    const next = Math.max(0, Math.min(totalDuration, currentTime + deltaSec));
+    set({ currentTime: Number(next.toFixed(3)) });
+  },
+  setTotalDuration: (totalDuration) => {
+    const valid = Math.max(1, Math.min(120, totalDuration));
+    const { currentTime, layers } = get();
+    set({
+      totalDuration: valid,
+      currentTime: Math.min(currentTime, valid),
+      layers: layers.map(l => {
+        const start = Math.min(l.timelineStart, valid - 0.2);
+        const duration = Math.min(l.timelineDuration, valid - start);
+        return { ...l, timelineStart: Math.max(0, start), timelineDuration: Math.max(0.2, duration) };
+      }),
+      saveStatus: 'unsaved'
+    });
+  },
   setPlaybackSpeed: (playbackSpeed) => set({ playbackSpeed }),
   toggleLoop: () => set(state => ({ isLooping: !state.isLooping })),
+  setTimelineZoom: (timelineZoom) => set({ timelineZoom: Math.max(0.5, Math.min(3.0, timelineZoom)) }),
+  toggleTimelineSnap: () => set(state => ({ snapToTimelineGrid: !state.snapToTimelineGrid })),
+
+  updateLayerTiming: (id, start, duration) => {
+    const { layers, totalDuration } = get();
+    const target = layers.find(l => l.id === id);
+    if (!target) return;
+
+    const safeStart = Math.max(0, Math.min(totalDuration - 0.2, Number(start.toFixed(2))));
+    const maxDur = totalDuration - safeStart;
+    const safeDuration = Math.max(0.2, Math.min(maxDur, Number(duration.toFixed(2))));
+
+    set({
+      layers: layers.map(l => l.id === id ? { ...l, timelineStart: safeStart, timelineDuration: safeDuration } : l),
+      saveStatus: 'unsaved'
+    });
+  },
+
+  reorderLayersList: (sourceIndex, destIndex) => {
+    const { layers } = get();
+    if (sourceIndex < 0 || sourceIndex >= layers.length || destIndex < 0 || destIndex >= layers.length) return;
+    get().recordHistory();
+
+    const updated = [...layers];
+    const [moved] = updated.splice(sourceIndex, 1);
+    updated.splice(destIndex, 0, moved);
+
+    // Update Z-Index sequentially
+    updated.forEach((l, i) => {
+      l.zIndex = (i + 1) * 10;
+    });
+
+    set({ layers: updated, saveStatus: 'unsaved' });
+  },
 
   saveProject: async () => {
     set({ saveStatus: 'saving' });
