@@ -10,13 +10,21 @@ export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    const token = ApiClient.getToken();
-    if (token) {
-      ApiClient.fetch('/auth/me')
-        .then((u) => setUser(u))
-        .catch(() => ApiClient.setToken(null));
-    }
+    const checkUser = () => {
+      const token = ApiClient.getToken() || (typeof window !== 'undefined' ? localStorage.getItem('festiveui_token') || localStorage.getItem('festiveui_admin_token') : null);
+      if (token) {
+        ApiClient.setToken(token);
+        ApiClient.fetch('/auth/me')
+          .then((u) => setUser(u))
+          .catch(() => {});
+      }
+    };
+    checkUser();
+    window.addEventListener('storage', checkUser);
+    return () => window.removeEventListener('storage', checkUser);
   }, []);
+
+  const isSuper = user?.isSuperAdmin || (user?.roles || []).some((r: any) => typeof r === 'string' && r.toLowerCase().includes('super'));
 
   const handleLogout = () => {
     ApiClient.setToken(null);
@@ -97,13 +105,16 @@ export const Navbar: React.FC = () => {
                 <LayoutDashboard className="w-4 h-4 text-primary-400" />
                 Dashboard
               </Link>
-              {user.roles?.includes('SUPER_ADMIN') && (
-                <Link
-                  href="/admin"
-                  className="px-3 py-1.5 text-sm font-medium rounded-lg bg-red-950/40 border border-red-800/60 text-red-200 flex items-center gap-1.5 hover:bg-red-900/50 transition-colors"
+              {isSuper && (
+                <a
+                  href="http://localhost:3001"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 text-xs font-bold rounded-lg bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-red-500/20 border border-amber-500/40 text-amber-300 flex items-center gap-1.5 hover:from-amber-500/30 hover:to-orange-500/30 transition-all shadow-sm shadow-amber-500/10"
                 >
-                  Admin
-                </Link>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  Super Admin Panel :3001
+                </a>
               )}
               <button
                 onClick={handleLogout}
