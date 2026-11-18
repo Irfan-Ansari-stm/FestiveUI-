@@ -1,0 +1,17 @@
+FROM node:20-alpine AS base
+RUN npm install -g pnpm
+
+WORKDIR /app
+COPY pnpm-workspace.yaml package.json turbo.json .npmrc ./
+COPY packages/ ./packages/
+COPY apps/api/ ./apps/api/
+COPY prisma/ ./prisma/
+
+RUN pnpm install --filter @festiveui/api...
+RUN pnpm --filter @festiveui/types build
+RUN pnpm --filter @festiveui/core build
+RUN pnpm prisma generate --schema=prisma/schema.prisma
+RUN pnpm --filter @festiveui/api build
+
+EXPOSE 4000
+CMD ["pnpm", "--filter", "@festiveui/api", "run", "start:prod"]

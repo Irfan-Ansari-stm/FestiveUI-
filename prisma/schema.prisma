@@ -1,0 +1,622 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. users
+model User {
+  id               String          @id @default(uuid()) @db.Uuid
+  email            String          @unique
+  passwordHash     String          @map("password_hash")
+  emailVerified    Boolean         @default(false) @map("email_verified")
+  verificationToken String?        @map("verification_token")
+  resetToken       String?         @map("reset_token")
+  resetTokenExpiry DateTime?       @map("reset_token_expiry")
+  status           String          @default("ACTIVE") // ACTIVE, SUSPENDED, PENDING
+  refreshTokenHash String?         @map("refresh_token_hash")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  deletedAt        DateTime?       @map("deleted_at")
+
+  profile          UserProfile?
+  userRoles        UserRole[]
+  projects         Project[]
+  purchases        Purchase[]
+  orders           Order[]
+  subscriptions    Subscription[]
+  favorites        Favorite[]
+  reviews          Review[]
+  notifications    Notification[]
+  auditLogs        AuditLog[]
+
+  @@map("users")
+}
+
+// 2. user_profiles
+model UserProfile {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @map("user_id") @db.Uuid
+  firstName   String?  @map("first_name")
+  lastName    String?  @map("last_name")
+  avatarUrl   String?  @map("avatar_url")
+  company     String?
+  bio         String?
+  country     String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+// 3. roles
+model Role {
+  id          String     @id @default(uuid()) @db.Uuid
+  name        String     @unique // SUPER_ADMIN, ADMIN, DEVELOPER, USER
+  description String?
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  userRoles   UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+// 4. permissions
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String           @unique // e.g. "animations:create", "festivals:publish"
+  description String?
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+// Mapping roles to permissions
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// 5. user_roles
+model UserRole {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+// 6. festivals
+model Festival {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   // Diwali, Holi, Christmas, etc.
+  slug        String   @unique
+  description String?
+  startDate   DateTime? @map("start_date")
+  endDate     DateTime? @map("end_date")
+  thumbnailUrl String?  @map("thumbnail_url")
+  bannerUrl   String?  @map("banner_url")
+  isFeatured  Boolean  @default(false) @map("is_featured")
+  published   Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  collections FestivalCollection[]
+  animations  Animation[]
+
+  @@map("festivals")
+}
+
+// 7. festival_collections
+model FestivalCollection {
+  id          String   @id @default(uuid()) @db.Uuid
+  festivalId  String   @map("festival_id") @db.Uuid
+  name        String
+  slug        String   @unique
+  description String?
+  bannerUrl   String?  @map("banner_url")
+  published   Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  festival    Festival @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+
+  @@map("festival_collections")
+}
+
+// 8. categories
+model Category {
+  id          String      @id @default(uuid()) @db.Uuid
+  name        String      @unique
+  slug        String      @unique
+  description String?
+  icon        String?
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  animations  Animation[]
+
+  @@map("categories")
+}
+
+// 9. animations
+model Animation {
+  id              String             @id @default(uuid()) @db.Uuid
+  festivalId      String             @map("festival_id") @db.Uuid
+  categoryId      String             @map("category_id") @db.Uuid
+  name            String
+  slug            String             @unique
+  description     String
+  thumbnailUrl    String             @map("thumbnail_url")
+  previewUrl      String?            @map("preview_url")
+  currentVersion  String             @default("1.0.0") @map("current_version")
+  format          String             // canvas, svg, css, lottie, webgl
+  isFree          Boolean            @default(true) @map("is_free")
+  price           Decimal            @default(0.00) @db.Decimal(10, 2)
+  licenseType     String             @default("free") @map("license_type") // free, commercial, extended
+  author          String             @default("FestiveUI Official")
+  status          String             @default("PUBLISHED") // DRAFT, REVIEW, PUBLISHED, DEPRECATED
+  downloadsCount  Int                @default(0) @map("downloads_count")
+  viewsCount      Int                @default(0) @map("views_count")
+  supportedFrameworks String[]       @default(["react", "next", "vue", "angular", "vanilla", "web-component"]) @map("supported_frameworks")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  deletedAt       DateTime?          @map("deleted_at")
+
+  festival        Festival           @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  category        Category           @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  versions        AnimationVersion[]
+  assets          AnimationAsset[]
+  schema          AnimationSchema?
+  tags            AnimationTag[]
+  favorites       Favorite[]
+  reviews         Review[]
+  orderItems      OrderItem[]
+  installations   ProjectInstallation[]
+
+  @@index([festivalId])
+  @@index([categoryId])
+  @@index([status])
+  @@map("animations")
+}
+
+// 10. animation_versions
+model AnimationVersion {
+  id            String    @id @default(uuid()) @db.Uuid
+  animationId   String    @map("animation_id") @db.Uuid
+  version       String    // e.g. "1.0.0", "1.1.0"
+  changelog     String?
+  bundleUrl     String?   @map("bundle_url")
+  checksum      String?
+  isLatest      Boolean   @default(true) @map("is_latest")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  animation     Animation @relation(fields: [animationId], references: [id], onDelete: Cascade)
+
+  @@unique([animationId, version])
+  @@map("animation_versions")
+}
+
+// 11. animation_assets
+model AnimationAsset {
+  id          String    @id @default(uuid()) @db.Uuid
+  animationId String    @map("animation_id") @db.Uuid
+  assetType   String    // thumbnail, preview_mp4, svg_code, lottie_json, texture
+  assetUrl    String    @map("asset_url")
+  fileSize    Int?      @map("file_size")
+  mimeType    String?   @map("mime_type")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  animation   Animation @relation(fields: [animationId], references: [id], onDelete: Cascade)
+
+  @@map("animation_assets")
+}
+
+// 12. animation_schemas
+model AnimationSchema {
+  id          String    @id @default(uuid()) @db.Uuid
+  animationId String    @unique @map("animation_id") @db.Uuid
+  schemaJson  Json      @map("schema_json") // Schema definition with properties, controls, types
+  defaultSettings Json  @map("default_settings")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  animation   Animation @relation(fields: [animationId], references: [id], onDelete: Cascade)
+
+  @@map("animation_schemas")
+}
+
+// 13. animation_tags
+model AnimationTag {
+  animationId String    @map("animation_id") @db.Uuid
+  tagId       String    @map("tag_id") @db.Uuid
+
+  animation   Animation @relation(fields: [animationId], references: [id], onDelete: Cascade)
+  tag         Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([animationId, tagId])
+  @@map("animation_tags")
+}
+
+// 14. tags
+model Tag {
+  id            String         @id @default(uuid()) @db.Uuid
+  name          String         @unique
+  slug          String         @unique
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  animationTags AnimationTag[]
+
+  @@map("tags")
+}
+
+// 15. projects
+model Project {
+  id            String                @id @default(uuid()) @db.Uuid
+  userId        String                @map("user_id") @db.Uuid
+  name          String
+  websiteUrl    String?               @map("website_url")
+  framework     String                @default("react") // react, next, vue, angular, vanilla
+  environment   String                @default("production") // production, staging, development
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+  deletedAt     DateTime?             @map("deleted_at")
+
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  domains       ProjectDomain[]
+  apiKeys       ProjectApiKey[]
+  installations ProjectInstallation[]
+  editorDocs    EditorDocument[]
+  apiLogs       ApiLog[]
+
+  @@map("projects")
+}
+
+// 16. project_domains
+model ProjectDomain {
+  id         String   @id @default(uuid()) @db.Uuid
+  projectId  String   @map("project_id") @db.Uuid
+  domain     String   // e.g. "myshop.com", "localhost"
+  verified   Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, domain])
+  @@map("project_domains")
+}
+
+// 17. project_api_keys
+model ProjectApiKey {
+  id          String    @id @default(uuid()) @db.Uuid
+  projectId   String    @map("project_id") @db.Uuid
+  name        String    @default("Default Key")
+  keyHash     String    @unique @map("key_hash")
+  keyPrefix   String    @map("key_prefix") // e.g. "fst_live_ab12..."
+  revoked     Boolean   @default(false)
+  lastUsedAt  DateTime? @map("last_used_at")
+  expiresAt   DateTime? @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  apiLogs     ApiLog[]
+
+  @@map("project_api_keys")
+}
+
+// 18. project_installations
+model ProjectInstallation {
+  id          String    @id @default(uuid()) @db.Uuid
+  projectId   String    @map("project_id") @db.Uuid
+  animationId String    @map("animation_id") @db.Uuid
+  configJson  Json?     @map("config_json")
+  active      Boolean   @default(true)
+  installedAt DateTime  @default(now()) @map("installed_at")
+
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  animation   Animation @relation(fields: [animationId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, animationId])
+  @@map("project_installations")
+}
+
+// 19. editor_documents
+model EditorDocument {
+  id          String                  @id @default(uuid()) @db.Uuid
+  projectId   String?                 @map("project_id") @db.Uuid
+  userId      String                  @map("user_id") @db.Uuid
+  title       String                  @default("Untitled Animation Canvas")
+  mode        String                  @default("canvas") // canvas, website
+  targetSelector String?              @map("target_selector")
+  content     Json                    // Layers, elements, positions, speeds, colors
+  isPublished Boolean                 @default(false) @map("is_published")
+  createdAt   DateTime                @default(now()) @map("created_at")
+  updatedAt   DateTime                @updatedAt @map("updated_at")
+
+  project     Project?                @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  versions    EditorDocumentVersion[]
+
+  @@map("editor_documents")
+}
+
+// 20. editor_document_versions
+model EditorDocumentVersion {
+  id               String         @id @default(uuid()) @db.Uuid
+  editorDocumentId String         @map("editor_document_id") @db.Uuid
+  versionNumber    Int            @map("version_number")
+  title            String?
+  contentSnapshot  Json           @map("content_snapshot")
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  document         EditorDocument @relation(fields: [editorDocumentId], references: [id], onDelete: Cascade)
+
+  @@unique([editorDocumentId, versionNumber])
+  @@map("editor_document_versions")
+}
+
+// 21. favorites
+model Favorite {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  animationId String    @map("animation_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animation   Animation @relation(fields: [animationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, animationId])
+  @@map("favorites")
+}
+
+// 22. purchases
+model Purchase {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  orderId     String    @map("order_id") @db.Uuid
+  licenseId   String?   @map("license_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  license     License?  @relation(fields: [licenseId], references: [id])
+
+  @@map("purchases")
+}
+
+// 23. orders
+model Order {
+  id          String      @id @default(uuid()) @db.Uuid
+  userId      String      @map("user_id") @db.Uuid
+  orderNumber String      @unique @map("order_number")
+  totalAmount Decimal     @map("total_amount") @db.Decimal(10, 2)
+  currency    String      @default("USD")
+  status      String      @default("COMPLETED") // PENDING, COMPLETED, FAILED, REFUNDED
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       OrderItem[]
+  payments    Payment[]
+  invoices    Invoice[]
+  purchases   Purchase[]
+
+  @@map("orders")
+}
+
+// 24. order_items
+model OrderItem {
+  id          String    @id @default(uuid()) @db.Uuid
+  orderId     String    @map("order_id") @db.Uuid
+  animationId String    @map("animation_id") @db.Uuid
+  price       Decimal   @db.Decimal(10, 2)
+  licenseType String    @default("commercial") @map("license_type")
+
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  animation   Animation @relation(fields: [animationId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
+
+// 25. subscriptions
+model Subscription {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  planId    String           @map("plan_id") @db.Uuid
+  status    String           @default("ACTIVE") // ACTIVE, CANCELED, PAST_DUE
+  period    String           @default("MONTHLY") // MONTHLY, YEARLY
+  startDate DateTime         @default(now()) @map("start_date")
+  endDate   DateTime?        @map("end_date")
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan      SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  payments  Payment[]
+
+  @@map("subscriptions")
+}
+
+// 26. subscription_plans
+model SubscriptionPlan {
+  id             String         @id @default(uuid()) @db.Uuid
+  code           String         @unique // FREE, PRO, BUSINESS, ENTERPRISE
+  name           String
+  description    String?
+  priceMonthly   Decimal        @map("price_monthly") @db.Decimal(10, 2)
+  priceYearly    Decimal        @map("price_yearly") @db.Decimal(10, 2)
+  maxProjects    Int            @default(3) @map("max_projects")
+  maxApiRequests Int            @default(50000) @map("max_api_requests")
+  features       String[]
+  isPopular      Boolean        @default(false) @map("is_popular")
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  subscriptions  Subscription[]
+
+  @@map("subscription_plans")
+}
+
+// 27. payments
+model Payment {
+  id             String        @id @default(uuid()) @db.Uuid
+  orderId        String?       @map("order_id") @db.Uuid
+  subscriptionId String?       @map("subscription_id") @db.Uuid
+  provider       String        @default("stripe") // stripe, razorpay, mock
+  transactionId  String        @unique @map("transaction_id")
+  amount         Decimal       @db.Decimal(10, 2)
+  currency       String        @default("USD")
+  status         String        @default("SUCCEEDED") // SUCCEEDED, PENDING, FAILED
+  paymentMethod  String?       @map("payment_method")
+  rawResponse    Json?         @map("raw_response")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  order          Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@map("payments")
+}
+
+// 28. invoices
+model Invoice {
+  id            String    @id @default(uuid()) @db.Uuid
+  orderId       String    @map("order_id") @db.Uuid
+  invoiceNumber String    @unique @map("invoice_number")
+  amount        Decimal   @db.Decimal(10, 2)
+  currency      String    @default("USD")
+  pdfUrl        String?   @map("pdf_url")
+  issuedAt      DateTime  @default(now()) @map("issued_at")
+
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("invoices")
+}
+
+// 29. coupons
+model Coupon {
+  id              String    @id @default(uuid()) @db.Uuid
+  code            String    @unique
+  discountPercent Int       @map("discount_percent")
+  maxUses         Int       @default(100) @map("max_uses")
+  timesUsed       Int       @default(0) @map("times_used")
+  validUntil      DateTime? @map("valid_until")
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@map("coupons")
+}
+
+// 30. licenses
+model License {
+  id           String     @id @default(uuid()) @db.Uuid
+  licenseKey   String     @unique @map("license_key")
+  licenseType  String     @default("commercial") @map("license_type") // commercial, extended
+  boundDomain  String?    @map("bound_domain")
+  status       String     @default("ACTIVE") // ACTIVE, REVOKED, EXPIRED
+  issuedAt     DateTime   @default(now()) @map("issued_at")
+  expiresAt    DateTime?  @map("expires_at")
+
+  purchases    Purchase[]
+
+  @@map("licenses")
+}
+
+// 31. reviews
+model Review {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  animationId String    @map("animation_id") @db.Uuid
+  rating      Int       @default(5)
+  title       String?
+  comment     String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animation   Animation @relation(fields: [animationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, animationId])
+  @@map("reviews")
+}
+
+// 32. usage_logs
+model UsageLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  projectId  String?  @map("project_id") @db.Uuid
+  metricName String   @map("metric_name") // render_count, mount_duration, frame_drop
+  value      Float
+  metadata   Json?
+  timestamp  DateTime @default(now())
+
+  @@index([projectId, timestamp])
+  @@map("usage_logs")
+}
+
+// 33. api_logs
+model ApiLog {
+  id          String         @id @default(uuid()) @db.Uuid
+  projectId   String?        @map("project_id") @db.Uuid
+  apiKeyId    String?        @map("api_key_id") @db.Uuid
+  endpoint    String
+  method      String
+  statusCode  Int            @map("status_code")
+  ipAddress   String?        @map("ip_address")
+  origin      String?
+  timestamp   DateTime       @default(now())
+
+  project     Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  apiKey      ProjectApiKey? @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, timestamp])
+  @@map("api_logs")
+}
+
+// 34. notifications
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  title     String
+  message   String
+  isRead    Boolean  @default(false) @map("is_read")
+  linkUrl   String?  @map("link_url")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+// 35. audit_logs
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String   // e.g. "ANIMATION_PUBLISHED", "USER_ROLE_CHANGED", "KEY_REVOKED"
+  resource   String   // e.g. "animations/123"
+  ipAddress  String?  @map("ip_address")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}

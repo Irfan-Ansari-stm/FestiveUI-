@@ -1,0 +1,17 @@
+FROM node:20-alpine AS base
+RUN npm install -g pnpm
+
+WORKDIR /app
+COPY pnpm-workspace.yaml package.json turbo.json .npmrc ./
+COPY packages/ ./packages/
+COPY apps/web/ ./apps/web/
+
+RUN pnpm install --filter @festiveui/web...
+RUN pnpm --filter @festiveui/types build
+RUN pnpm --filter @festiveui/core build
+RUN pnpm --filter @festiveui/react build
+RUN pnpm --filter @festiveui/next build
+RUN pnpm --filter @festiveui/web build
+
+EXPOSE 3000
+CMD ["pnpm", "--filter", "@festiveui/web", "run", "start"]

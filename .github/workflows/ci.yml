@@ -1,0 +1,87 @@
+name: FestiveUI Enterprise CI/CD
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test-and-build:
+    name: Build, Test & Lint
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: festiveui_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install Monorepo Dependencies
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Build Core & Adapter Packages
+        run: |
+          pnpm --filter @festiveui/types build
+          pnpm --filter @festiveui/core build
+          pnpm --filter @festiveui/react build
+          pnpm --filter @festiveui/next build
+          pnpm --filter @festiveui/vue build
+          pnpm --filter @festiveui/angular build
+          pnpm --filter @festiveui/web-component build
+
+      - name: Prisma Client Generation & Schema Sync
+        env:
+          DATABASE_URL: "postgresql://postgres:postgrespassword@localhost:5432/festiveui_db?schema=public"
+        run: |
+          pnpm prisma generate --schema=prisma/schema.prisma
+          pnpm prisma db push --schema=prisma/schema.prisma
+
+      - name: Run Backend Unit & Integration Tests
+        env:
+          DATABASE_URL: "postgresql://postgres:postgrespassword@localhost:5432/festiveui_db?schema=public"
+          JWT_SECRET: "ci_jwt_secret_test_key"
+          JWT_REFRESH_SECRET: "ci_jwt_refresh_secret_test_key"
+        run: pnpm --filter @festiveui/api test
+
+      - name: Build NestJS Production Backend
+        run: pnpm --filter @festiveui/api build
+
+      - name: Build Next.js Production Web & Studio App
+        env:
+          NEXT_PUBLIC_API_URL: "http://localhost:4000/api/v1"
+          NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+        run: pnpm --filter @festiveui/web build

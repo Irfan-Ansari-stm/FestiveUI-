@@ -1,0 +1,38 @@
+{
+  "name": "festiveui-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Festival & Event UI Animation Library, Visual Editor and Marketplace",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "db:generate": "pnpm --filter @festiveui/api run prisma:generate",
+    "db:migrate": "pnpm --filter @festiveui/api run prisma:migrate",
+    "db:seed": "pnpm --filter @festiveui/api run prisma:seed"
+  },
+  "devDependencies": {
+    "@prisma/client": "5.22.0",
+    "@types/bcrypt": "^6.0.0",
+    "@types/node": "^26.6.6",
+    "bcrypt": "^6.0.0",
+    "prettier": "^3.2.5",
+    "prisma": "5.22.0",
+    "ts-node": "^10.9.2",
+    "turbo": "^2.4.4",
+    "typescript": "^5.4.5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "@scarf/scarf",
+      "bcrypt",
+      "prisma"
+    ]
+  },
+  "packageManager": "pnpm@12.16.1"
+}
